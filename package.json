@@ -1,0 +1,33 @@
+{
+  "name": "cozy-routing",
+  "version": "0.0.1",
+  "description": "Tool to manage cozy routing",
+  "license": "GPL v3",
+  "main": "./lib/main",
+  "scripts": {
+    "prepublish": "cake build"
+  },
+  "bin": {
+    "cozy-monitor": "./bin/cozy-routing"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mycozycloud/cozy-routing"
+  },
+  "keywords": [
+    "routing",
+    "cozy",
+    "upnp"
+  ],
+  "engines": {
+    "node": "0.8 || 0.9 || 0.10"
+  },
+  "dependencies": {
+    "coffee-script": "~1.4.0",
+    "commander": "=1.0.5",
+    "request-json": "= 0.4.3",
+    "nat-upnp": "0.2.9"
+  },
+  "devDependencies": {},
+  "author": "Cozy Cloud"
+}

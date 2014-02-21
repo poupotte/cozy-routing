@@ -5,7 +5,6 @@ client = natUpnp.createClient();
 pkg = require '../package.json'
 version = pkg.version
 Client = require('request-json').JsonClient
-#server = require '../test/server-test/server.coffee'
 
 
 
@@ -13,7 +12,6 @@ program
   .version(version)
   .usage('<action> <app>')
 
-## Applications management ##
 
 fakeServer = (json, code=200) ->
 
@@ -57,8 +55,6 @@ extIp = (cb) =>
         console.log(err) if err?
         cb(ip)
 
-
-# Install
 program
     .command("get-map-local")
     .description("Display local mapping")

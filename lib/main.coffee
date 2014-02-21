@@ -132,10 +132,10 @@ program
                 console.log("Remove route")
                 unportMap item, (err) =>
                     console.log("Stop server")
-                    testServer.close()
+                    server.close()
                     process.exit 0
             else
-                testServer.close()
+                server.close()
                 process.exit 0
 
         console.log('Start test server')  
@@ -145,7 +145,7 @@ program
         portMap 443, 9105, 0, "test1:digidisk", (err) =>
             if err
                 console.log(err) 
-                exit(server,item)
+                exit(testServer, false)
             else
                 getMap (list) =>
                     found = false
@@ -155,15 +155,15 @@ program
                             if item.private.port isnt 9105
                                 console.log('Error: bad private port')
                                 console.log(item)
-                                exit(server,item)
+                                exit(testServer,item)
                             else if item.description isnt "test1:digidisk"
                                 console.log('Error: bad description')
                                 console.log(item)
-                                exit(server,item)
+                                exit(testServer,item)
                             else if item.ttl isnt 0
                                 console.log('Eror: bad ttl')
                                 console.log(item)
-                                exit(server,item)
+                                exit(testServer,item)
                             else
                                 console.log("Route has been correctly added")
                                 if debug?
@@ -176,7 +176,7 @@ program
                                         console.log("err: #{err}")
                                     if body.msg is not  'ok'
                                         console.log("Error: bad response")
-                                        exit(server,item)
+                                        exit(testServer,item)
                                     else
                                         console.log('... Ok')
                                         extIp (ip) =>
@@ -189,13 +189,13 @@ program
                                                     console.log("err: #{err}")
                                                 if body.msg isnt 'ok'
                                                     console.log("Error: bad response")
-                                                    exit(server,item)
+                                                    exit(testServer,item)
                                                 else
                                                     console.log('... Ok')
                                                     console.log('Test 1 is correct !')
-                                                    exit(server,item)
+                                                    exit(testServer,item)
                     if not found
-                        exit(server,false)
+                        exit(testServer,false)
 
 program
     .command("test-ext-partA [debug]")

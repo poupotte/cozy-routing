@@ -2,6 +2,7 @@ natUpnp = require('nat-upnp');
 program = require 'commander'
 client = natUpnp.createClient();
 pkg = require '../package.json'
+http = require 'http'
 version = pkg.version
 fs = require 'fs'
 Client = require('request-json').JsonClient
@@ -196,7 +197,7 @@ program
 
 program
     .command("test-local [debug]")
-    .description("Test 1")
+    .description("Test local")
     .action (debug) ->
         exit = (server, item) =>
             if item?
@@ -267,6 +268,93 @@ program
                                                     exit(testServer,item)
                     if not found
                         exit(testServer,false)
+
+program
+    .command("test-ext-partA [debug]")
+    .description("Test 2 Part A")
+    .action (debug) ->
+        console.log('Start test server')
+        testServer = fakeServer(msg: 'ok', 200)
+        testServer.listen 9105, "0.0.0.0"
+        console.log("Mapping private port 9105 to public port 443 with ttl 60")
+        portMap 443, 9105, 0, "test1:digidisk", (err) =>
+            if err
+                console.log(err)
+                testServer.close()
+                process.exit 0
+            else
+                getMap (list) =>
+                    found = false
+                    for item in list
+                        if item.public.port is 443
+                            found = true
+                            if item.private.port isnt 9105
+                                console.log('Error: bad private port')
+                                console.log(item)
+                                testServer.close()
+                                process.exit 0
+                            else if item.description isnt "test1:digidisk"
+                                console.log('Error: bad description')
+                                console.log(item)
+                                testServer.close()
+                                process.exit 0
+                            else if item.ttl isnt 0
+                                console.log('Error: bad ttl')
+                                console.log(item)
+                                testServer.close()
+                                process.exit 0
+                            else
+                                console.log("Route has been correctly added")
+                                if debug?
+                                    console.log item
+                                console.log("Try to request with server with private port ...")
+                                server = new Client('http://localhost:9105')
+                                server.get '/', (err,res, body) =>
+                                    if debug?
+                                        console.log("body: #{JSON.stringify(body)}")
+                                        console.log("err: #{err}")
+                                    if body.msg is not 'ok'
+                                        console.log("Error: bad response")
+                                        testServer.close()
+                                        process.exit 0
+                                    else
+                                        console.log('... Ok')
+                                        extIp (ip) =>
+                                            console.log("Your public IP adress is : #{ip}")
+                                            console.log("Can you try to request http://#{ip}:443 from exterior ....")
+                                            console.log("Stop this program when you have finish your test and execute test2-partB to remove the route")
+
+program
+    .command("test-ext-partB [debug]")
+    .description("Test 2")
+    .action (debug) ->
+        getMap (list) =>
+            found = false
+            for item in list
+                if item.public.port is 443
+                    found = true
+                    if item.private.port isnt 9105
+                        console.log('Error: bad private port')
+                        console.log(item)
+                        process.exit 0
+                    else if item.description isnt "test1:digidisk"
+                        console.log('Error: bad description')
+                        console.log(item)
+                        process.exit 0
+                    else if item.ttl isnt 0
+                        console.log('Error: bad ttl')
+                        console.log(item)
+                        process.exit 0
+                    else
+                        unportMap item, (err) =>
+                            console.log("Route successfully removed")
+                            process.exit 0
+            if not found
+                console.log("Error: route not found")
+                process.exit 0
+
+
+
 
 program 
     .command("update-ip <file>")

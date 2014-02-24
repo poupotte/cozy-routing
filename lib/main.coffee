@@ -11,10 +11,10 @@ program
   .usage('<action> <app>')
 
 
-getMap = (cb)=>
+getMap = (cb) =>
     client.getMappings (err, list) =>
         console.log(err) if err
-        cb(list)
+        cb(err, list)
 
 portMap = (pub, priv, ttl, desc, cb) =>
     doc =
@@ -32,15 +32,14 @@ unportMap = (doc, cb) =>
 extIp = (cb) =>
      client.externalIp (err, ip) =>
         console.log(err) if err?
-        cb(ip)
+        cb(err, ip)
 
 intIp = (cb) =>
     client.findGateway (err, gateway, ip) =>
         console.log(err) if err?
-        console.log(ip)
-        cb(ip)
+        cb(err, ip)
 
-updateIp = (file, cb) =>
+updateIp = (file, error, cb) =>
     if fs.existsSync file
         config = {}
         confs = fs.readFileSync file, 'utf8'
@@ -51,10 +50,15 @@ updateIp = (file, cb) =>
         console.log(config)
         cc = new Client(config["c&c_url"])
         cc.setBasicAuth config.id, config.password
-        extIp (ip) =>
+        extIp (err, ip) =>
             data =
                 ippublic: ip
                 portssh: 0
+                error: {}
+            if err
+                data.error.ip = err
+            if error
+                data.error.port = error
             cc.post '/updateip', data, (err,res, body) =>
                 console.log(body)
                 if err or not body.success
@@ -65,40 +69,43 @@ updateIp = (file, cb) =>
         cb("Error: file doesn't exist")
 
 updateRoute = (port, cb) =>
-    getMap (list) =>
+    getMap (err, list) =>
         found = false
-        intIp (ip) =>
-            for route in list
-                if route.public.port is 443
-                    found = true
-                    # A route exists
-                    console.log(route)
-                    if route.private.port is parseInt(port) and route.ttl is 0 and route.private.host is ip
-                        # Route is correct
-                        cb('Route already created')
-                    else
-                        console.log("An other route on 443 exist")
-                        # Remove old route
-                        console.log("Remove old route ...")
-                        unportMap route, (err) =>
-                            if err
-                                cb(err)
-                            else
-                                # Create new route
-                                console.log("Create new route ...")
-                                portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                                    if err
-                                        cb(err)
-                                    else
-                                        cb()
-            if not found
-                console.log("Route creation")
-                # Create new route
-                portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                    if err
-                        cb(err)
-                    else
-                        cb()
+        intIp (err, ip) =>
+            if err?
+                cb(err)
+            else
+                for route in list
+                    if route.public.port is 443
+                        found = true
+                        # A route exists
+                        console.log(route)
+                        if route.private.port is parseInt(port) and route.ttl is 0 and route.private.host is ip
+                            # Route is correct
+                            cb('Route already created')
+                        else
+                            console.log("An other route on 443 exist")
+                            # Remove old route
+                            console.log("Remove old route ...")
+                            unportMap route, (err) =>
+                                if err
+                                    cb(err)
+                                else
+                                    # Create new route
+                                    console.log("Create new route ...")
+                                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
+                                        if err
+                                            cb(err)
+                                        else
+                                            cb()
+                if not found
+                    console.log("Route creation")
+                    # Create new route
+                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
+                        if err
+                            cb(err)
+                        else
+                            cb()
 
 program
     .command("get-map-local")
@@ -111,13 +118,22 @@ program
             process.exit 0
 
 program
+    .command("get-map-desc <desc>")
+    .description("Display mapping with description <desc>")
+    .action (desc) ->
+        console.log("Display mapping with description #{desc}....")
+        client.getMappings "description":desc, (err, res) =>
+            console.log(err) if err?
+            console.log(res)
+            process.exit 0
+
+program
     .command("get-map")
     .description("Display mapping")
     .action () ->
         console.log("get mapping ....")
-        client.getMappings (err, res) =>
-            console.log(err) if err?
-            console.log(res)
+        getMap (err, list) =>
+            console.log(list)
             process.exit 0
 
 
@@ -126,34 +142,32 @@ program
     .description("Display external IP")
     .action () ->
         console.log("Recover external IP ....")
-        client.externalIp (err, ip) =>
+        extIp (err, ip) =>
             console.log(err) if err?
-            console.log(ip)
+            console.log(ip) if ip?
             process.exit 0
 
 
 program 
-    .command("add-route <public> <private> <ttl>")
+    .command("add-route <public> <private> <ttl> <desc>")
     .description("Add route")
-    .action (pub, priv, ttl) ->
+    .action (pub, priv, ttl, desc) ->
         console.log("Add route ....")
-        doc =
-            "public": parseInt(pub)
-            "private": parseInt(priv)
-            "ttl": parseInt(ttl)
-        console.log(doc)
-        client.portMapping doc, (err) =>
-            console.log("Add route failed: #{err}") if err?
-            console.log("Route successfully added")
+        portMap pub, priv, ttl, desc, (err) =>
+            if err?
+                console.log("Add route failed: #{err}")
+            else
+                console.log("Route successfully added")
             process.exit 0
 
 program 
     .command("internal-ip")
     .description("Add route")
     .action () ->
-        client.findGateway (err, gateway, ip) =>
+        console.log("Recover internal IP ....")
+        intIp (err, ip) =>
             console.log(err) if err?
-            console.log(ip)
+            console.log(ip) if ip?
             process.exit 0
 
 
@@ -161,61 +175,85 @@ program
     .command("remove-route <public> <private> <desc>")
     .description("Remove route")
     .action (pub, priv, desc) ->
-        getMap (list) =>
-            found = false
-            for item in list
-                if item.public.port is parseInt(pub) and item.private.port is parseInt(priv) and item.description is desc
-                    found  = true
-                    unportMap item, (err) =>
-                        if err?
-                            console.log(err) 
+        # Retrive route
+        getMap (err, list) =>
+            if err
+                console.log('Cannot retrieve routes')
+                process.exit 1
+            else
+                found = false
+                for item in list
+                    if item.public.port is parseInt(pub) and item.private.port is parseInt(priv) and item.description is desc
+                        found  = true
+                        # Remove route
+                        unportMap item, (err) =>
+                            if err?
+                                console.log(err) 
+                            else
+                                console.log('Route successfully removed')
                             process.exit 0
-                        else
-                            console.log('Route successfully removed')
-                            process.exit 0
-            if not found
-                console.log("Route not found")
-                process.exit 0
+                if not found
+                    console.log("Route not found")
+                    process.exit 0
 
 program 
     .command("update-ip <file>")
     .description("Update IP public")
     .action (file) ->
         if fs.existsSync file
+            # Read configuration file
             config = {}
             confs = fs.readFileSync file, 'utf8'
             confs = confs.split('\n')
             for conf in confs
                 conf = conf.split('=')
-                config[conf[0]] = conf[1]
+                if conf[0] and conf[1]?
+                    config[conf[0]] = conf[1]
+                else
+                    console.log("Configuration file seems to have uncorrect syntax")
             console.log(config)
+            # Create c&c client
             cc = new Client(config["c&c_url"])
             cc.setBasicAuth config.id, config.password
-            extIp (ip) =>
-                data =
-                    ippublic: ip
-                    portssh: 0
-                cc.post '/updateip', data, (err,res, body) =>
+            # Recover external ip
+            extIp (err, ip) =>
+                if err
+                    console.log("Cannot retrieve external IP")
                     console.log(err)
-                    if err or not body.success
-                        console.log(err)
-                        process.exit 0
-                    else
-                        console.log('IP successfully updated')
-                        process.exit 0
-
+                else
+                    # Update ip
+                    data =
+                        ippublic: ip
+                        portssh: 0
+                        error: 
+                            "ip": err
+                    cc.post '/updateip', data, (err,res, body) =>
+                        if err or not body.success
+                            console.log(err)
+                            process.exit 1
+                        else
+                            console.log('IP successfully updated')
+                            process.exit 0
         else
             console.log("Error: file doesn't exist")
-            process.exit 0
+            process.exit 1
 
 
 program 
     .command("update-route <port>")
     .description("Update route")
     .action (port) ->
-        getMap (list) =>
+        getMap (err, list) =>
+            if err
+                console.log("Cannot retrieve routes")
+                console.log(err)
+                process.exit 1
             found = false
-            intIp (ip) =>
+            intIp (err, ip) =>
+                if err
+                    console.log("Cannot retrieve internal IP")
+                    console.log(err)
+                    process.exit 1
                 for route in list
                     if route.public.port is 443
                         found = true
@@ -256,19 +294,17 @@ program
     .command("update <file>")
     .description("Update route and IP public")
     .action (file) ->
-        console.log('Update IP ...')
-        updateIp file, (err) =>
-            if err
-                console.log(err)
-                process.exit 0
-            console.log('Update route ...')
-            updateRoute 9104, (err) =>
+        console.log('Update route ...')
+        updateRoute 9104, (error) =>
+            if error
+                console.log(error)
+            console.log('Update IP ...')
+            updateIp file, error, (err) =>
                 if err
                     console.log(err)
-                    process.exit 0
                 else
                     console.log('Route and IP successfully updated')
-                    process.exit 0
+                process.exit 0
 
 program
     .command("*")

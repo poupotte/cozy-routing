@@ -243,7 +243,7 @@ program
                 console.log(err) 
                 exit(testServer, false)
             else
-                getMap (list) =>
+                getMap (err, list) =>
                     found = false
                     for item in list
                         if item.public.port is 443
@@ -275,7 +275,7 @@ program
                                         exit(testServer,item)
                                     else
                                         console.log('... Ok')
-                                        extIp (ip) =>
+                                        extIp (err, ip) =>
                                             console.log("Your public IP adress is : #{ip}")
                                             console.log("Try to request with server with public port ...")
                                             server = new Client("http://#{ip}:443")                   
@@ -307,7 +307,7 @@ program
                 testServer.close()
                 process.exit 0
             else
-                getMap (list) =>
+                getMap (err, list) =>
                     found = false
                     for item in list
                         if item.public.port is 443
@@ -343,7 +343,7 @@ program
                                         process.exit 0
                                     else
                                         console.log('... Ok')
-                                        extIp (ip) =>
+                                        extIp (err, ip) =>
                                             console.log("Your public IP adress is : #{ip}")
                                             console.log("Can you try to request http://#{ip}:443 from exterior ....")
                                             console.log("Stop this program when you have finish your test and execute test2-partB to remove the route")
@@ -352,7 +352,7 @@ program
     .command("test-ext-partB [debug]")
     .description("Test 2")
     .action (debug) ->
-        getMap (list) =>
+        getMap (err, list) =>
             found = false
             for item in list
                 if item.public.port is 443

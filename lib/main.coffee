@@ -11,6 +11,8 @@ program
   .usage('<action> <app>')
 
 
+## Helpers
+
 getMap = (cb) =>
     client.getMappings (err, list) =>
         console.log(err) if err
@@ -107,6 +109,9 @@ updateRoute = (port, cb) =>
                         else
                             cb()
 
+
+## Commands
+
 program
     .command("get-map-local")
     .description("Display local mapping")
@@ -149,7 +154,7 @@ program
 
 
 program 
-    .command("add-route <public> <private> <ttl> <desc>")
+    .command("add-route <public> <private> <ttl> <description>")
     .description("Add route")
     .action (pub, priv, ttl, desc) ->
         console.log("Add route ....")
@@ -172,7 +177,7 @@ program
 
 
 program 
-    .command("remove-route <public> <private> <desc>")
+    .command("remove-route <public> <private> <description>")
     .description("Remove route")
     .action (pub, priv, desc) ->
         # Retrive route
@@ -198,7 +203,7 @@ program
 
 program 
     .command("update-ip <file>")
-    .description("Update IP public")
+    .description("Update IP public to c&c with configuration in <file>")
     .action (file) ->
         if fs.existsSync file
             # Read configuration file
@@ -241,7 +246,7 @@ program
 
 program 
     .command("update-route <port>")
-    .description("Update route")
+    .description("Update route from public port <port> to 443 with ttl 0 and description 'digidisk'")
     .action (port) ->
         getMap (err, list) =>
             if err
@@ -291,14 +296,16 @@ program
                         process.exit 0
 
 program 
-    .command("update <file>")
-    .description("Update route and IP public")
+    .command("update [file]")
+    .description("Update route and IP public to c&c with configuration in <file>, by default file is /etc/cozy/cozy-routing.conf")
     .action (file) ->
         console.log('Update route ...')
         updateRoute 9104, (error) =>
             if error
                 console.log(error)
             console.log('Update IP ...')
+            if not file
+                file = "/etc/cozy/cozy-routing.conf"
             updateIp file, error, (err) =>
                 if err
                     console.log(err)

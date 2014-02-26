@@ -237,7 +237,7 @@ program
         console.log('Start test server')  
         testServer = fakeServer(msg: 'ok', 200)
         testServer.listen 9105, "0.0.0.0"
-        console.log("Mapping private port 9105 to public port 443 with ttl 0")
+        console.log("Mapping private port 9105 to public port 443 with ttl 60")
         portMap 443, 9105, 60, "test1:digidisk", (err) =>
             if err
                 console.log(err) 

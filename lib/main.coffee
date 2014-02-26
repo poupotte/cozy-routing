@@ -111,17 +111,6 @@ updateRoute = (port, cb) =>
 
 
 ## Commands
-
-program
-    .command("get-map-local")
-    .description("Display local mapping")
-    .action () ->
-        console.log("Display local mapping ....")
-        client.getMappings "local":true, (err, res) =>
-            console.log(err) if err?
-            console.log(res)
-            process.exit 0
-
 program
     .command("get-map-desc <desc>")
     .description("Display mapping with description <desc>")

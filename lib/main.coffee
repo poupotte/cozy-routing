@@ -1,3 +1,6 @@
+
+require "colors"
+
 natUpnp = require('nat-upnp');
 program = require 'commander'
 client = natUpnp.createClient();
@@ -220,9 +223,9 @@ program
                     process.exit 0
 
 program
-    .command("test-local-ttl [debug]")
+    .command("test-local-ttl <port> [debug]")
     .description("Test local")
-    .action (debug) ->
+    .action (port, debug) ->
         exit = (server, item) =>
             if item?
                 console.log("Remove route")
@@ -236,9 +239,9 @@ program
 
         console.log('Start test server')  
         testServer = fakeServer(msg: 'ok', 200)
-        testServer.listen 9105, "0.0.0.0"
-        console.log("Mapping private port 9105 to public port 443 with ttl 60")
-        portMap 443, 9105, 60, "test1:digidisk", (err) =>
+        testServer.listen parseInt(port), "0.0.0.0"
+        console.log("Mapping private port #{port} to public port 443 with ttl 60")
+        portMap 443, parseInt(port), 60, "test1:digidisk", (err) =>
             if err
                 console.log(err) 
                 exit(testServer, false)
@@ -248,27 +251,23 @@ program
                     for item in list
                         if item.public.port is 443
                             found = true
-                            if item.private.port isnt 9105
-                                console.log('Error: bad private port')
-                                console.log(item)
+                            console.log(item)
+                            if item.private.port isnt parseInt(port)
+                                console.log 'Error: bad private port'.red
                                 exit(testServer,item)
                             else if item.description isnt "test1:digidisk"
-                                console.log('Error: bad description')
-                                console.log(item)
+                                console.log 'Error: bad description'.red
                                 exit(testServer,item)
                             else
                                 console.log("Route has been correctly added")
-                                console.log(item)
-                                if debug?
-                                    console.log item
                                 console.log("Try to request with server with private port ...")
-                                server = new Client('http://localhost:9105')
+                                server = new Client("http://localhost:#{port}")
                                 server.get '/', (err,res, body) =>
                                     if debug?
                                         console.log("body: #{JSON.stringify(body)}")
                                         console.log("err: #{err}")
-                                    if body.msg is not  'ok'
-                                        console.log("Error: bad response")
+                                    if not body or body.msg is not  'ok'
+                                        console.log "Error: bad response".red
                                         exit(testServer,item)
                                     else
                                         console.log('... Ok')
@@ -279,21 +278,21 @@ program
                                             server.get '/', (err,res, body) =>
                                                 if debug?
                                                     console.log("body: #{JSON.stringify(body)}")
-                                                    console.log("err: #{err}")
+                                                    console.log "err: #{err}".red
                                                 if body.msg isnt 'ok'
-                                                    console.log("Error: bad response")
+                                                    console.log "Error: bad response".red
                                                     exit(testServer,item)
                                                 else
                                                     console.log('... Ok')
-                                                    console.log('Test 1 is correct !')
+                                                    console.log 'Test local with ttl 60 is correct !'.green
                                                     exit(testServer,item)
                     if not found
                         exit(testServer,false)
 
 program
-    .command("test-local [debug]")
+    .command("test-local <port> [debug]")
     .description("Test local")
-    .action (debug) ->
+    .action (port, debug) ->
         exit = (server, item) =>
             if item?
                 console.log("Remove route")
@@ -307,9 +306,9 @@ program
 
         console.log('Start test server')  
         testServer = fakeServer(msg: 'ok', 200)
-        testServer.listen 9105, "0.0.0.0"
-        console.log("Mapping private port 9105 to public port 443 with ttl 0")
-        portMap 443, 9105, 0, "test1:digidisk", (err) =>
+        testServer.listen parseInt(port), "0.0.0.0"
+        console.log("Mapping private port #{port} to public port 443 with ttl 0")
+        portMap 443, parseInt(port), 0, "test1:digidisk", (err) =>
             if err
                 console.log(err) 
                 exit(testServer, false)
@@ -319,30 +318,28 @@ program
                     for item in list
                         if item.public.port is 443
                             found = true
-                            if item.private.port isnt 9105
-                                console.log('Error: bad private port')
-                                console.log(item)
+                            console.log(item)
+                            if item.private.port isnt parseInt(port)
+                                console.log 'Error: bad private port'.red
                                 exit(testServer,item)
                             else if item.description isnt "test1:digidisk"
-                                console.log('Error: bad description')
-                                console.log(item)
+                                console.log 'Error: bad description'.red
                                 exit(testServer,item)
                             else if item.ttl isnt 0
-                                console.log('Eror: bad ttl')
-                                console.log(item)
+                                console.log 'Error: bad ttl'.red
                                 exit(testServer,item)
                             else
                                 console.log("Route has been correctly added")
                                 if debug?
                                     console.log item
                                 console.log("Try to request with server with private port ...")
-                                server = new Client('http://localhost:9105')
+                                server = new Client("http://localhost:#{port}")
                                 server.get '/', (err,res, body) =>
                                     if debug?
                                         console.log("body: #{JSON.stringify(body)}")
                                         console.log("err: #{err}")
-                                    if body.msg is not  'ok'
-                                        console.log("Error: bad response")
+                                    if not body or body.msg is not  'ok'
+                                        console.log "Error: bad response".red
                                         exit(testServer,item)
                                     else
                                         console.log('... Ok')
@@ -353,26 +350,26 @@ program
                                             server.get '/', (err,res, body) =>
                                                 if debug?
                                                     console.log("body: #{JSON.stringify(body)}")
-                                                    console.log("err: #{err}")
+                                                    console.log "err: #{err}".red
                                                 if body.msg isnt 'ok'
-                                                    console.log("Error: bad response")
+                                                    console.log "Error: bad response".red
                                                     exit(testServer,item)
                                                 else
                                                     console.log('... Ok')
-                                                    console.log('Test 1 is correct !')
+                                                    console.log 'Test local with ttl 0 is correct !'.green
                                                     exit(testServer,item)
                     if not found
                         exit(testServer,false)
 
 program
-    .command("test-ext-partA [debug]")
+    .command("test-ext-partA <port> [debug]")
     .description("Test 2 Part A")
-    .action (debug) ->
+    .action (port, debug) ->
         console.log('Start test server')
         testServer = fakeServer(msg: 'ok', 200)
-        testServer.listen 9105, "0.0.0.0"
-        console.log("Mapping private port 9105 to public port 443 with ttl 60")
-        portMap 443, 9105, 0, "test1:digidisk", (err) =>
+        testServer.listen parseInt(port), "0.0.0.0"
+        console.log("Mapping private port #{port} to public port 443 with ttl 60")
+        portMap 443, parseInt(port), 0, "test1:digidisk", (err) =>
             if err
                 console.log(err)
                 testServer.close()
@@ -383,19 +380,19 @@ program
                     for item in list
                         if item.public.port is 443
                             found = true
-                            if item.private.port isnt 9105
-                                console.log('Error: bad private port')
+                            if item.private.port isnt parseInt(port)
                                 console.log(item)
+                                console.log 'Error: bad private port'.red
                                 testServer.close()
                                 process.exit 0
                             else if item.description isnt "test1:digidisk"
-                                console.log('Error: bad description')
                                 console.log(item)
+                                console.log 'Error: bad description'.red
                                 testServer.close()
                                 process.exit 0
                             else if item.ttl isnt 0
-                                console.log('Error: bad ttl')
                                 console.log(item)
+                                console.log 'Error: bad ttl'.red
                                 testServer.close()
                                 process.exit 0
                             else
@@ -403,13 +400,13 @@ program
                                 if debug?
                                     console.log item
                                 console.log("Try to request with server with private port ...")
-                                server = new Client('http://localhost:9105')
+                                server = new Client("http://localhost:#{port}")
                                 server.get '/', (err,res, body) =>
                                     if debug?
                                         console.log("body: #{JSON.stringify(body)}")
                                         console.log("err: #{err}")
                                     if body.msg is not 'ok'
-                                        console.log("Error: bad response")
+                                        console.log "Error: bad response".red
                                         testServer.close()
                                         process.exit 0
                                     else
@@ -420,32 +417,32 @@ program
                                             console.log("Stop this program when you have finish your test and execute test2-partB to remove the route")
 
 program
-    .command("test-ext-partB [debug]")
+    .command("test-ext-partB <port> [debug]")
     .description("Test 2")
-    .action (debug) ->
+    .action (port, debug) ->
         getMap (err, list) =>
             found = false
             for item in list
                 if item.public.port is 443
                     found = true
-                    if item.private.port isnt 9105
-                        console.log('Error: bad private port')
+                    if item.private.port isnt parseInt(port)
                         console.log(item)
+                        console.log 'Error: bad private port'.red
                         process.exit 0
                     else if item.description isnt "test1:digidisk"
-                        console.log('Error: bad description')
                         console.log(item)
+                        console.log 'Error: bad description'.red
                         process.exit 0
                     else if item.ttl isnt 0
-                        console.log('Error: bad ttl')
                         console.log(item)
+                        console.log 'Error: bad ttl'.red
                         process.exit 0
                     else
                         unportMap item, (err) =>
-                            console.log("Route successfully removed")
+                            console.log "Route successfully removed".green
                             process.exit 0
             if not found
-                console.log("Error: route not found")
+                console.log "Error: route not found".red
                 process.exit 0
 
 

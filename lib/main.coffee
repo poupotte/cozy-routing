@@ -220,6 +220,77 @@ program
                     process.exit 0
 
 program
+    .command("test-local-ttl [debug]")
+    .description("Test local")
+    .action (debug) ->
+        exit = (server, item) =>
+            if item?
+                console.log("Remove route")
+                unportMap item, (err) =>
+                    console.log("Stop server")
+                    server.close()
+                    process.exit 0
+            else
+                server.close()
+                process.exit 0
+
+        console.log('Start test server')  
+        testServer = fakeServer(msg: 'ok', 200)
+        testServer.listen 9105, "0.0.0.0"
+        console.log("Mapping private port 9105 to public port 443 with ttl 0")
+        portMap 443, 9105, 60, "test1:digidisk", (err) =>
+            if err
+                console.log(err) 
+                exit(testServer, false)
+            else
+                getMap (err, list) =>
+                    found = false
+                    for item in list
+                        if item.public.port is 443
+                            found = true
+                            if item.private.port isnt 9105
+                                console.log('Error: bad private port')
+                                console.log(item)
+                                exit(testServer,item)
+                            else if item.description isnt "test1:digidisk"
+                                console.log('Error: bad description')
+                                console.log(item)
+                                exit(testServer,item)
+                            else
+                                console.log("Route has been correctly added")
+                                console.log(item)
+                                if debug?
+                                    console.log item
+                                console.log("Try to request with server with private port ...")
+                                server = new Client('http://localhost:9105')
+                                server.get '/', (err,res, body) =>
+                                    if debug?
+                                        console.log("body: #{JSON.stringify(body)}")
+                                        console.log("err: #{err}")
+                                    if body.msg is not  'ok'
+                                        console.log("Error: bad response")
+                                        exit(testServer,item)
+                                    else
+                                        console.log('... Ok')
+                                        extIp (err, ip) =>
+                                            console.log("Your public IP adress is : #{ip}")
+                                            console.log("Try to request with server with public port ...")
+                                            server = new Client("http://#{ip}:443")                   
+                                            server.get '/', (err,res, body) =>
+                                                if debug?
+                                                    console.log("body: #{JSON.stringify(body)}")
+                                                    console.log("err: #{err}")
+                                                if body.msg isnt 'ok'
+                                                    console.log("Error: bad response")
+                                                    exit(testServer,item)
+                                                else
+                                                    console.log('... Ok')
+                                                    console.log('Test 1 is correct !')
+                                                    exit(testServer,item)
+                    if not found
+                        exit(testServer,false)
+
+program
     .command("test-local [debug]")
     .description("Test local")
     .action (debug) ->

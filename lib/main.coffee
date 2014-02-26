@@ -405,7 +405,7 @@ program
                                     if debug?
                                         console.log("body: #{JSON.stringify(body)}")
                                         console.log("err: #{err}")
-                                    if body.msg is not 'ok'
+                                    if not body or body.msg is not 'ok'
                                         console.log "Error: bad response".red
                                         testServer.close()
                                         process.exit 0

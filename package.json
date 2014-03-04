@@ -8,7 +8,7 @@
     "prepublish": "cake build"
   },
   "bin": {
-    "cozy-monitor": "./bin/cozy-routing"
+    "cozy-routing": "./bin/cozy-routing"
   },
   "repository": {
     "type": "git",

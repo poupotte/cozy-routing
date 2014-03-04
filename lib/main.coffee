@@ -42,25 +42,28 @@ intIp = (cb) =>
         cb(err, ip)
 
 updateIp = (config, port, error, cb) =>
-    cc = new Client(config["c&c_url"])
-    cc.setBasicAuth config.id, config.password
-    extIp (err, ip) =>
-        data =
-            ippublic: ip
-            portssh: port
-        if err
-            error.ip = err
-        if Object.keys(error).length isnt 0
-            data.error = error
-        console.log(data)
-        cc.post '/updateip', data, (err,res, body) =>
-            console.log(body)
-            if data.error
-                cb(data.error, config)
-            if err or not body.success
-                cb(err, config)
-            else
-                cb(null, config)
+    if config["c&c_url"]? and config.id? and config.password?
+        cc = new Client(config["c&c_url"])
+        cc.setBasicAuth config.id, config.password
+        extIp (err, ip) =>
+            data =
+                ippublic: ip
+                portssh: port
+            if err
+                error.ip = err
+            if Object.keys(error).length isnt 0
+                data.error = error
+            console.log(data)
+            cc.post '/updateip', data, (err,res, body) =>
+                console.log(body)
+                if data.error
+                    cb(data.error)
+                if err or not body.success
+                    cb(err)
+                else
+                    cb(null)
+    else
+        cb('Bad configuration')
 
 updateRoute = (port, cb) =>
     getMap (err, list) =>
@@ -73,7 +76,6 @@ updateRoute = (port, cb) =>
                     if route.public.port is 443
                         found = true
                         # A route exists
-                        console.log(route)
                         if route.private.port is parseInt(port) and
                             route.private.host is ip and
                             (route.ttl > 86400 or route.ttl is 0)
@@ -111,44 +113,48 @@ updateRoute = (port, cb) =>
                         else
                             cb()
 
-updateSshPort = (port, cb) ->
-    getMap (err, list) =>
-        found = false
-        intIp (err, ip) =>
-            if err?
-                cb(err)
-            else
-                for route in list
-                    if route.public.port is port
-                        found = true
-                        if route.private.host is ip and route.private.port is 22
-                            if route.ttl > 86400 or route.ttl is 0
-                                cb(null, port)
-                            else
-                                console.log("Remove old route ...")
-                                unportMap route, (error) =>
-                                    console.log("Add new route ...")
-                                    # Create new route with ttl of 1 week
-                                    portMap port, 22, 604800, "digidisk-ssh", (err) =>
-                                        if error
-                                            cb(error, port)
-                                        if err
-                                            cb(err, port)
-                                        else
-                                            cb(null, port)
-                        else
-                            updateSshPort(port+1, cb)
-                if not found
-                    # Create new route with ttl of 1 week
-                    portMap port, 22, 0, "digidisk-ssh", (err) =>
-                        if err
-                            portMap port, 22, 604800, "digidisk-ssh", (err) =>
-                                if err
-                                    cb(err, port)
-                                else
+updateSshPort = (config, cb) ->
+    if config.ssh_port?
+        port = config.ssh_port
+        getMap (err, list) =>
+            found = false
+            intIp (err, ip) =>
+                if err?
+                    cb(err)
+                else
+                    for route in list
+                        if route.public.port is port
+                            found = true
+                            if route.private.host is ip and route.private.port is 22
+                                if route.ttl > 86400 or route.ttl is 0
                                     cb(null, port)
-                        else
-                            cb(null, port)
+                                else
+                                    console.log("Remove old route ...")
+                                    unportMap route, (error) =>
+                                        console.log("Add new route ...")
+                                        # Create new route with ttl of 1 week
+                                        portMap port, 22, 604800, "digidisk-ssh", (err) =>
+                                            if error
+                                                cb(error, port)
+                                            if err
+                                                cb(err, port)
+                                            else
+                                                cb(null, port)
+                            else
+                                updateSshPort(port+1, cb)
+                    if not found
+                        # Create new route with ttl of 1 week
+                        portMap port, 22, 0, "digidisk-ssh", (err) =>
+                            if err
+                                portMap port, 22, 604800, "digidisk-ssh", (err) =>
+                                    if err
+                                        cb(err, port)
+                                    else
+                                        cb(null, port)
+                            else
+                                cb(null, port)
+    else
+        cb('No ssh port configuration', undefined)
 
 ## Basic function
 program
@@ -234,7 +240,7 @@ program
     .action (file) ->
         error = {}
         console.log('Update route ...')
-        updateRoute 5984, (err) =>
+        updateRoute 9104, (err) =>
             if err
                 console.log("Error: #{err}")
                 error.port = err
@@ -248,11 +254,11 @@ program
                 for conf in confs
                     conf = conf.split('=')
                     config[conf[0]] = conf[1]
-                updateSshPort parseInt(config.port_ssh), (err, port) =>
+                updateSshPort config, (err, port) =>
                     if err
                         console.log("Error: #{err}")
                         error.ssh = err
-                    updateIp config, port, error, (err, config) =>
+                    updateIp config, port, error, (err) =>
                         if err
                             console.log("Error : ")
                             console.log(err)

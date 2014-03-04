@@ -19,4 +19,4 @@ The main configurations are :
     password
 
     # Default ssh port
-    port_ssh
+    ssh_port

@@ -41,34 +41,26 @@ intIp = (cb) =>
         console.log(err) if err?
         cb(err, ip)
 
-updateIp = (file, error, cb) =>
-    if fs.existsSync file
-        config = {}
-        confs = fs.readFileSync file, 'utf8'
-        confs = confs.split('\n')
-        for conf in confs
-            conf = conf.split('=')
-            config[conf[0]] = conf[1]
-        console.log(config)
-        cc = new Client(config["c&c_url"])
-        cc.setBasicAuth config.id, config.password
-        extIp (err, ip) =>
-            data =
-                ippublic: ip
-                portssh: 0
-                error: {}
-            if err
-                data.error.ip = err
-            if error
-                data.error.port = error
-            cc.post '/updateip', data, (err,res, body) =>
-                console.log(body)
-                if err or not body.success
-                    cb(err)
-                else
-                    cb()
-    else
-        cb("Error: file doesn't exist")
+updateIp = (config, port, error, cb) =>
+    cc = new Client(config["c&c_url"])
+    cc.setBasicAuth config.id, config.password
+    extIp (err, ip) =>
+        data =
+            ippublic: ip
+            portssh: port
+        if err
+            error.ip = err
+        if Object.keys(error).length isnt 0
+            data.error = error
+        console.log(data)
+        cc.post '/updateip', data, (err,res, body) =>
+            console.log(body)
+            if data.error
+                cb(data.error, config)
+            if err or not body.success
+                cb(err, config)
+            else
+                cb(null, config)
 
 updateRoute = (port, cb) =>
     getMap (err, list) =>
@@ -82,35 +74,83 @@ updateRoute = (port, cb) =>
                         found = true
                         # A route exists
                         console.log(route)
-                        if route.private.port is parseInt(port) and route.ttl is 0 and route.private.host is ip
-                            # Route is correct
-                            cb('Route already created')
+                        if route.private.port is parseInt(port) and
+                            route.private.host is ip and
+                            (route.ttl > 86400 or route.ttl is 0)
+                                # Route is correct and ttl > 1 day
+                                console.log("Route already created")
+                                cb()
                         else
                             console.log("An other route on 443 exist")
                             # Remove old route
                             console.log("Remove old route ...")
-                            unportMap route, (err) =>
+                            unportMap route, (error) =>
+                                console.log("Create new route ...")
+                                portMap 443, parseInt(port), 0, "digidisk", (err) =>
+                                    if err
+                                        # Create new route with ttl of 1 week
+                                        portMap 443, parseInt(port), 604800, "digidisk", (err) =>
+                                            if error
+                                                cb(error)
+                                            if err
+                                                cb(err)
+                                            else
+                                                cb()
+                                    else
+                                        cb()
+                if not found
+                    console.log("Route creation")
+                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
+                        if err
+                            # Create new route with ttl of 7 days
+                            portMap 443, parseInt(port), 604800, "digidisk", (err) =>
                                 if err
                                     cb(err)
                                 else
-                                    # Create new route
-                                    console.log("Create new route ...")
-                                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                                        if err
-                                            cb(err)
-                                        else
-                                            cb()
-                if not found
-                    console.log("Route creation")
-                    # Create new route
-                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                        if err
-                            cb(err)
+                                    cb()
                         else
                             cb()
 
+updateSshPort = (port, cb) ->
+    getMap (err, list) =>
+        found = false
+        intIp (err, ip) =>
+            if err?
+                cb(err)
+            else
+                for route in list
+                    if route.public.port is port
+                        found = true
+                        if route.private.host is ip and route.private.port is 22
+                            if route.ttl > 86400 or route.ttl is 0
+                                cb(null, port)
+                            else
+                                console.log("Remove old route ...")
+                                unportMap route, (error) =>
+                                    console.log("Add new route ...")
+                                    # Create new route with ttl of 1 week
+                                    portMap port, 22, 604800, "digidisk-ssh", (err) =>
+                                        if error
+                                            cb(error, port)
+                                        if err
+                                            cb(err, port)
+                                        else
+                                            cb(null, port)
+                        else
+                            updateSshPort(port+1, cb)
+                if not found
+                    # Create new route with ttl of 1 week
+                    portMap port, 22, 0, "digidisk-ssh", (err) =>
+                        if err
+                            portMap port, 22, 604800, "digidisk-ssh", (err) =>
+                                if err
+                                    cb(err, port)
+                                else
+                                    cb(null, port)
+                        else
+                            cb(null, port)
 
-## Commands
+## Basic function
 program
     .command("get-map-desc <desc>")
     .description("Display mapping with description <desc>")
@@ -130,7 +170,6 @@ program
             console.log(list)
             process.exit 0
 
-
 program
     .command("external-ip")
     .description("Display external IP")
@@ -141,6 +180,15 @@ program
             console.log(ip) if ip?
             process.exit 0
 
+program 
+    .command("internal-ip")
+    .description("Display internal IP")
+    .action () ->
+        console.log("Recover internal IP ....")
+        intIp (err, ip) =>
+            console.log(err) if err?
+            console.log(ip) if ip?
+            process.exit 0
 
 program 
     .command("add-route <public> <private> <ttl> <description>")
@@ -153,17 +201,6 @@ program
             else
                 console.log("Route successfully added")
             process.exit 0
-
-program 
-    .command("internal-ip")
-    .description("Add route")
-    .action () ->
-        console.log("Recover internal IP ....")
-        intIp (err, ip) =>
-            console.log(err) if err?
-            console.log(ip) if ip?
-            process.exit 0
-
 
 program 
     .command("remove-route <public> <private> <description>")
@@ -190,117 +227,40 @@ program
                     console.log("Route not found")
                     process.exit 0
 
-program 
-    .command("update-ip <file>")
-    .description("Update IP public to c&c with configuration in <file>")
-    .action (file) ->
-        if fs.existsSync file
-            # Read configuration file
-            config = {}
-            confs = fs.readFileSync file, 'utf8'
-            confs = confs.split('\n')
-            for conf in confs
-                conf = conf.split('=')
-                if conf[0] and conf[1]?
-                    config[conf[0]] = conf[1]
-                else
-                    console.log("Configuration file seems to have uncorrect syntax")
-            console.log(config)
-            # Create c&c client
-            cc = new Client(config["c&c_url"])
-            cc.setBasicAuth config.id, config.password
-            # Recover external ip
-            extIp (err, ip) =>
-                if err
-                    console.log("Cannot retrieve external IP")
-                    console.log(err)
-                else
-                    # Update ip
-                    data =
-                        ippublic: ip
-                        portssh: 0
-                        error: 
-                            "ip": err
-                    cc.post '/updateip', data, (err,res, body) =>
-                        if err or not body.success
-                            console.log(err)
-                            process.exit 1
-                        else
-                            console.log('IP successfully updated')
-                            process.exit 0
-        else
-            console.log("Error: file doesn't exist")
-            process.exit 1
-
-
-program 
-    .command("update-route <port>")
-    .description("Update route from public port <port> to 443 with ttl 0 and description 'digidisk'")
-    .action (port) ->
-        getMap (err, list) =>
-            if err
-                console.log("Cannot retrieve routes")
-                console.log(err)
-                process.exit 1
-            found = false
-            intIp (err, ip) =>
-                if err
-                    console.log("Cannot retrieve internal IP")
-                    console.log(err)
-                    process.exit 1
-                for route in list
-                    if route.public.port is 443
-                        found = true
-                        # A route exists
-                        console.log(route)
-                        if route.private.port is parseInt(port) and route.ttl is 0 and route.private.ip is ip
-                            # Route is correct
-                            console.log('Route already created')
-                            process.exit 0
-                        else
-                            console.log("An other route on 443 exist")
-                            # Remove old route
-                            console.log("Remove old route ...")
-                            unportMap route, (err) =>
-                                if err
-                                    console.log(err)
-                                    process.exit 0
-                                else
-                                    # Create new route
-                                    console.log("Create new route ...")
-                                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                                        if err
-                                            console.log(err)
-                                        else
-                                            console.log("Route successfully added")
-                                        process.exit 0
-                if not found
-                    console.log("Route creation")
-                    # Create new route
-                    portMap 443, parseInt(port), 0, "digidisk", (err) =>
-                        if err
-                            console.log(err)
-                        else
-                            console.log("Route successfully added")
-                        process.exit 0
-
+## Update route, ip and ssh port
 program 
     .command("update [file]")
     .description("Update route and IP public to c&c with configuration in <file>, by default file is /etc/cozy/cozy-routing.conf")
     .action (file) ->
+        error = {}
         console.log('Update route ...')
-        updateRoute 9104, (error) =>
-            if error
-                console.log(error)
+        updateRoute 5984, (err) =>
+            if err
+                console.log("Error: #{err}")
+                error.port = err
             console.log('Update IP ...')
             if not file
-                file = "/etc/cozy/cozy-routing.conf"
-            updateIp file, error, (err) =>
-                if err
-                    console.log(err)
-                else
-                    console.log('Route and IP successfully updated')
-                process.exit 0
+                file = "/etc/cozy/cozy-routing.conf"                
+            if fs.existsSync file
+                config = {}
+                confs = fs.readFileSync file, 'utf8'
+                confs = confs.split('\n')
+                for conf in confs
+                    conf = conf.split('=')
+                    config[conf[0]] = conf[1]
+                updateSshPort parseInt(config.port_ssh), (err, port) =>
+                    if err
+                        console.log("Error: #{err}")
+                        error.ssh = err
+                    updateIp config, port, error, (err, config) =>
+                        if err
+                            console.log("Error : ")
+                            console.log(err)
+                        else
+                            console.log('Route and IP successfully updated')
+                        process.exit 0
+            else
+                cb("Error: file doesn't exist")
 
 program
     .command("*")
@@ -308,5 +268,6 @@ program
     .action ->
         console.log 'Unknown command, run "cozy-monitor --help"' + \
                     ' to know the list of available commands.'
+        process.exit 0
 
 program.parse process.argv 

@@ -282,7 +282,7 @@ program
     .command("*")
     .description("Display error message for an unknown command.")
     .action ->
-        console.log 'Unknown command, run "cozy-monitor --help"' + \
+        console.log 'Unknown command, run "cozy-routing --help"' + \
                     ' to know the list of available commands.'
         process.exit 0
 

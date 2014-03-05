@@ -4,6 +4,8 @@ client = natUpnp.createClient();
 pkg = require '../package.json'
 version = pkg.version
 fs = require 'fs'
+S = require 'string'
+async = require 'async'
 Client = require('request-json').JsonClient
 
 program
@@ -277,6 +279,33 @@ program
         else
             console.log("Error: file doesn't exist")
             process.exit 1
+
+
+## Clean digidisk routes
+program 
+    .command("clean")
+    .description("Clean Digidisk routes")
+    .action () ->   
+        getMap (err, list) =>
+            if err
+                console.log(err)
+            else
+                count = 0
+                async.eachSeries list, (route, cb) =>
+                    if S(route.description).count('digidisk') is 1
+                        count = count + 1
+                        console.log("Remove route #{route.description} : ")
+                        unportMap route, (err) =>
+                            if err
+                                console.log("    #{err}")
+                            else
+                                console.log "    Route successfully removed"
+                            cb()
+                    else    
+                        cb()
+                , (err) =>
+                    console.log("#{count} routes found")
+                    process.exit 0
 
 program
     .command("*")

@@ -1,12 +1,13 @@
-natUpnp = require('nat-upnp');
+natUpnp = require('nat-upnp')
 program = require 'commander'
-client = natUpnp.createClient();
+
+client = natUpnp.createClient()
 pkg = require '../package.json'
 version = pkg.version
 fs = require 'fs'
 S = require 'string'
 async = require 'async'
-Client = require('request-json').JsonClient
+request = require('request-json')
 
 program
   .version(version)
@@ -24,7 +25,7 @@ portMap = (pub, priv, ttl, desc, cb) =>
     doc =
         "public": parseInt(pub)
         "private": parseInt(priv)
-        "ttl": parseInt(ttl) 
+        "ttl": parseInt(ttl)
         "description": desc
     client.portMapping doc, (err) =>
         cb(err)
@@ -44,7 +45,7 @@ intIp = (cb) =>
         cb(err, ip)
 
 updateIp = (config, port, error, cb) =>
-    cc = new Client(config["c&c_url"])
+    cc = request.newClient(config["c&c_url"])
     cc.setBasicAuth config.id, config.password
     extIp (err, ip) =>
         data =
@@ -182,7 +183,7 @@ program
             console.log(ip) if ip?
             process.exit 0
 
-program 
+program
     .command("internal-ip")
     .description("Display internal IP")
     .action () ->
@@ -192,7 +193,7 @@ program
             console.log(ip) if ip?
             process.exit 0
 
-program 
+program
     .command("add-route <public> <private> <ttl> <description>")
     .description("Add route")
     .action (pub, priv, ttl, desc) ->
@@ -204,7 +205,7 @@ program
                 console.log("Route successfully added")
             process.exit 0
 
-program 
+program
     .command("remove-route <public> <private> <description>")
     .description("Remove route")
     .action (pub, priv, desc) ->
@@ -223,7 +224,7 @@ program
                             # Remove route
                             unportMap item, (err) =>
                                 if err?
-                                    console.log(err) 
+                                    console.log(err)
                                 else
                                     console.log('Route successfully removed')
                                 process.exit 0
@@ -232,14 +233,14 @@ program
                     process.exit 0
 
 ## Update route, ip and ssh port
-program 
+program
     .command("update [file]")
     .description("Update route and IP public to c&c with configuration in <file>,"
         + "by default file is /etc/cozy/cozy-routing.conf")
-    .action (file) ->   
+    .action (file) ->
         error = {}
         if not file
-            file = "/etc/cozy/cozy-routing.conf"                
+            file = "/etc/cozy/cozy-routing.conf"
         if fs.existsSync file
             config = {}
             confs = fs.readFileSync file, 'utf8'
@@ -253,7 +254,7 @@ program
                     if err
                         console.log("Error: #{err}")
                         error.port = err
-                    console.log('Update IP ...')               
+                    console.log('Update IP ...')
                     updateSshPort config, (err, port) =>
                         if err
                             console.log("Error: #{err}")
@@ -282,10 +283,10 @@ program
 
 
 ## Clean digidisk routes
-program 
+program
     .command("clean")
     .description("Clean Digidisk routes")
-    .action () ->   
+    .action () ->
         getMap (err, list) =>
             if err
                 console.log(err)
@@ -301,11 +302,39 @@ program
                             else
                                 console.log "    Route successfully removed"
                             cb()
-                    else    
+                    else
                         cb()
                 , (err) =>
                     console.log("#{count} routes found")
                     process.exit 0
+
+program
+    .command("set-locale <locale>")
+    .description("Change locale for locally installed Cozy.")
+    .action (locale) ->
+        client = request.newClient 'http://localhost:9103'
+        client.post 'api/instance', locale: locale, (err, res, body) ->
+            if err then console.log err
+            else if res.statusCode isnt 200
+                console.log 'Something went wrong while changing locale'
+                console.log body
+            else
+                console.log "Locale set with #{locale}"
+            process.exit 0
+
+program
+    .command("set-domain <domain>")
+    .description("Change domain for locally installed Cozy.")
+    .action (domain) ->
+        client = request.newClient 'http://localhost:9103'
+        client.post 'api/instance', domain: domain, (err, res, body) ->
+            if err then console.log err
+            else if res.statusCode isnt 200
+                console.log 'Something went wrong while changing domain'
+                console.log body
+            else
+                console.log "Domain set with #{domain}"
+            process.exit 0
 
 program
     .command("*")
@@ -315,4 +344,4 @@ program
                     ' to know the list of available commands.'
         process.exit 0
 
-program.parse process.argv 
+program.parse process.argv

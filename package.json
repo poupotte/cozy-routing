@@ -25,7 +25,7 @@
   "dependencies": {
     "coffee-script": "~1.4.0",
     "commander": "=1.0.5",
-    "request-json": "= 0.4.3",
+    "request-json": "0.4.6",
     "nat-upnp": "0.2.9",
     "async": "0.2.10",
     "string": "1.8.0"
